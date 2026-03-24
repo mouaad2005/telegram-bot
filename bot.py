@@ -2,10 +2,11 @@ import yt_dlp
 import os
 import asyncio
 import logging
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-# 🔥 logging (عشان نشوف الأخطاء)
+# 🔥 logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -13,25 +14,39 @@ logging.basicConfig(
 
 TOKEN = os.getenv("TOKEN")
 
-# ❌ لو التوكن ناقص → يوقف مباشرة
 if not TOKEN:
     raise ValueError("TOKEN is missing")
 
 user_state = {}
 
-# تحميل
+# 🔥 تنظيف الرابط (حل TikTok + اختصارات)
+def clean_url(url):
+    try:
+        url = url.split("?")[0]
+        r = requests.get(url, allow_redirects=True, timeout=5)
+        return r.url
+    except:
+        return url
+
+# 🔥 تحميل
 def download(url, audio=False):
+    url = clean_url(url)
+
     ydl_opts = {
-        'format': 'worst[ext=mp4]/worst',
+        'format': 'best',
         'outtmpl': '/tmp/%(id)s.%(ext)s',
         'quiet': True,
         'noplaylist': True,
         'nocheckcertificate': True,
-        'ignoreerrors': True,
-        'merge_output_format': 'mp4',
+        'geo_bypass': True,
+        'geo_bypass_country': 'US',
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0'
+        }
     }
 
     if audio:
+        ydl_opts['format'] = 'bestaudio'
         ydl_opts['postprocessors'] = [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -40,6 +55,10 @@ def download(url, audio=False):
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
+
+        if 'entries' in info:
+            info = info['entries'][0]
+
         return ydl.prepare_filename(info)
 
 # /start
