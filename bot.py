@@ -1,21 +1,34 @@
 import yt_dlp
 import os
 import asyncio
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-import os
+# 🔥 logging (عشان نشوف الأخطاء)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
 TOKEN = os.getenv("TOKEN")
+
+# ❌ لو التوكن ناقص → يوقف مباشرة
+if not TOKEN:
+    raise ValueError("TOKEN is missing")
 
 user_state = {}
 
 # تحميل
 def download(url, audio=False):
     ydl_opts = {
-        'format': 'bestaudio/best' if audio else 'best',
-        'outtmpl': '%(id)s.%(ext)s',
+        'format': 'worst[ext=mp4]/worst',
+        'outtmpl': '/tmp/%(id)s.%(ext)s',
         'quiet': True,
         'noplaylist': True,
+        'nocheckcertificate': True,
+        'ignoreerrors': True,
+        'merge_output_format': 'mp4',
     }
 
     if audio:
@@ -49,7 +62,6 @@ async def platform_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_state[query.from_user.id] = query.data
-
     await query.message.reply_text("📎 Send the link")
 
 # استقبال الرابط
@@ -78,8 +90,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # باقي المنصات
-    await update.message.reply_text("⏳ Downloading...")
+    await update.message.reply_text("⚡ Downloading...")
 
     try:
         file_path = await asyncio.to_thread(download, url, False)
@@ -94,7 +105,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.remove(file_path)
 
     except Exception as e:
-        print(e)
+        print("ERROR:", e)
         await update.message.reply_text("❌ Failed to download")
 
 # أزرار يوتيوب
@@ -111,7 +122,7 @@ async def youtube_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = user_state[user_id]
     url = data["url"]
 
-    await query.message.reply_text("⏳ Downloading...")
+    await query.message.reply_text("⚡ Downloading...")
 
     try:
         if query.data == "yt_audio":
@@ -119,7 +130,6 @@ async def youtube_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             with open(file_path, 'rb') as f:
                 await query.message.reply_audio(f)
-
         else:
             file_path = await asyncio.to_thread(download, url, False)
             file_size = os.path.getsize(file_path)
@@ -133,7 +143,7 @@ async def youtube_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         os.remove(file_path)
 
     except Exception as e:
-        print(e)
+        print("ERROR:", e)
         await query.message.reply_text("❌ Failed to download")
 
 # تشغيل
@@ -145,4 +155,8 @@ app.add_handler(CallbackQueryHandler(youtube_buttons, pattern="^yt_"))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 print("Bot running...")
-app.run_polling()
+
+try:
+    app.run_polling()
+except Exception as e:
+    print("CRASH ERROR:", e)
