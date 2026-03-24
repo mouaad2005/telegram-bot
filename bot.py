@@ -5,7 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 import os
-TOKEN = os.getenv "8586764861:AAEpCK4htO9goZknbUzL0TAjhjWvd4O4iVc"
+TOKEN = os.getenv("TOKEN")
 
 user_state = {}
 
